@@ -24,7 +24,7 @@ CAVES_PORT="${CAVES_PORT:-11000}"
 SHARD_MASTER_PORT="${SHARD_MASTER_PORT:-10888}"
 CLUSTER_KEY_ENV="${CLUSTER_KEY:-}"
 
-# Развести steam-порты по шардам (чтобы не кололись 27016):
+# Развести steam-порты по шардам
 MASTER_STEAM_PORT="${MASTER_STEAM_PORT:-27016}"
 MASTER_AUTH_PORT="${MASTER_AUTH_PORT:-8766}"
 CAVES_STEAM_PORT="${CAVES_STEAM_PORT:-27018}"
@@ -34,7 +34,7 @@ mkdir -p "$KLEI_ROOT/$CONF_DIR" "$DST_DIR" && chown -R steam:steam /home/steam /
 
 # ---------- Установка/обновление ----------
 if [ "${UPDATE_ON_START:-1}" = "1" ]; then
-  gosu steam bash -lc "$STEAMCMDDIR/steamcmd.sh +force_install_dir $DST_DIR +login anonymous +app_update 343050 +quit"
+  gosu steam "$STEAMCMDDIR/steamcmd.sh" +force_install_dir "$DST_DIR" +login anonymous +app_update 343050 +quit
 fi
 
 BIN="$DST_DIR/bin64/dontstarve_dedicated_server_nullrenderer_x64"
@@ -120,30 +120,45 @@ else
   echo "Найден существующий кластер: $CLUSTER_DIR — оставляю как есть"
 fi
 
-# ---------- Запуск ----------
+# ---------- Завершение и сигналы ----------
 term() { kill -TERM 0 2>/dev/null || true; }
 trap term INT TERM
 
-run_shared=( "$BIN" \
-  -persistent_storage_root "$KLEI_ROOT" \
-  -conf_dir "$CONF_DIR" \
-  -cluster "$CLUSTER_NAME" )
+# Общая часть аргументов
+RUN_SHARED_BASE=( "$BIN"
+  -persistent_storage_root "$KLEI_ROOT"
+  -conf_dir "$CONF_DIR"
+  -cluster "$CLUSTER_NAME"
+)
 
 # Master
-gosu steam bash -lc "cd $DST_DIR/bin64; exec \"${run_shared[@]}\" -shard Master -port ${MASTER_PORT} -steam_master_server_port ${MASTER_STEAM_PORT} -steam_authentication_port ${MASTER_AUTH_PORT}" &
+RUN_MASTER=( "${RUN_SHARED_BASE[@]}"
+  -shard Master
+  -port "$MASTER_PORT"
+  -steam_master_server_port "$MASTER_STEAM_PORT"
+  -steam_authentication_port "$MASTER_AUTH_PORT"
+)
+gosu steam "${RUN_MASTER[@]}" &
 PID_MASTER=$!
 
-# Caves (если есть)
+# Caves (если папка есть)
 if [ -d "$CAVES_DIR" ]; then
-  gosu steam bash -lc "cd $DST_DIR/bin64; exec \"${run_shared[@]}\" -shard Caves -port ${CAVES_PORT} -steam_master_server_port ${CAVES_STEAM_PORT} -steam_authentication_port ${CAVES_AUTH_PORT}" &
+  RUN_CAVES=( "${RUN_SHARED_BASE[@]}"
+    -shard Caves
+    -port "$CAVES_PORT"
+    -steam_master_server_port "$CAVES_STEAM_PORT"
+    -steam_authentication_port "$CAVES_AUTH_PORT"
+  )
+  gosu steam "${RUN_CAVES[@]}" &
   PID_CAVES=$!
 fi
 
-# ждём любой из процессов; при завершении — аккуратно гасим второй
+# Ждать процессы
 if [ -n "${PID_CAVES:-}" ]; then
   wait -n "$PID_MASTER" "$PID_CAVES" || true
 else
   wait "$PID_MASTER" || true
 fi
+
 term
 wait || true
