@@ -5,7 +5,9 @@ ENV STEAMCMDDIR=/opt/steamcmd \
     KLEI_ROOT=/home/steam/.klei \
     CONF_DIR=DoNotStarveTogether \
     CLUSTER_NAME=MyDediServer \
-    UPDATE_ON_START=1
+    UPDATE_ON_START=1 \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl tar gosu tini \
@@ -13,10 +15,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libcurl3-gnutls \
     && rm -rf /var/lib/apt/lists/*
     
-# опционально, чтобы не было предупреждения про locale:
-ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
-
-
 RUN useradd -m -s /bin/bash steam && mkdir -p "$STEAMCMDDIR" "$DST_DIR" "$KLEI_ROOT" \
     && chown -R steam:steam /opt /home/steam
 
