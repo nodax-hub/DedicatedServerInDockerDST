@@ -1,0 +1,16 @@
+services:
+  dst:
+    build: .
+    image: local/dst:latest
+    container_name: dst
+    restart: unless-stopped
+    # Если хост ARM (Apple Silicon и т.п.), раскомментируй:
+    # platform: linux/amd64
+    env_file:
+      - .env
+    volumes:
+      - ./data/DoNotStarveTogether:/home/steam/.klei/DoNotStarveTogether
+      - ./dst-install:/opt/dst
+    ports:
+      - "${MASTER_PORT:-10999}:${MASTER_PORT:-10999}/udp"
+      - "${CAVES_PORT:-11000}:${CAVES_PORT:-11000}/udp"
